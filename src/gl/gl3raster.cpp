@@ -319,9 +319,12 @@ allocateDXT(Raster *raster, int32 dxt, int32 numLevels, bool32 hasAlpha)
 
 	glGenTextures(1, &natras->texid);
 	uint32 prev = bindTexture(natras->texid);
+#ifndef __EMSCRIPTEN__
+	// (WebGL takes no compressed format here: the levels' uploads define the texture — rasterUnlock)
 	glTexImage2D(GL_TEXTURE_2D, 0, natras->internalFormat,
 	             raster->width, raster->height,
 	             0, natras->format, natras->type, nil);
+#endif
 	// TODO: allocate other levels...probably
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAX_LEVEL, natras->numLevels-1);
 	natras->filterMode = 0;

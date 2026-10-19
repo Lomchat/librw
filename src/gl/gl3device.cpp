@@ -15,6 +15,11 @@
 #include "rwgl3.h"
 #include "rwgl3shader.h"
 #include "rwgl3impl.h"
+#ifdef __EMSCRIPTEN__
+#include <emscripten.h>
+#include <emscripten/html5.h>
+extern "C" void OrthrosCanvasSize(int *width, int *height); // (the game's, src/skel/orthros_web.cpp)
+#endif
 
 #define PLUGIN_ID 0
 
@@ -89,6 +94,14 @@ const char *shaderDecl100es =
 "#define VSOUT varying\n"
 "#define FSIN varying\n"
 "#define FRAGCOLOR(c) (gl_FragColor = c)\n"
+"precision highp float;\n"
+"precision highp int;\n";
+const char *shaderDecl300es =
+"#version 300 es\n"
+"#define VSIN(index) layout(location = index) in\n"
+"#define VSOUT out\n"
+"#define FSIN in\n"
+"#define FRAGCOLOR(c) (fragColor = c)\n"
 "precision highp float;\n"
 "precision highp int;\n";
 const char *shaderDecl310es =
@@ -1407,11 +1420,17 @@ showRaster(Raster *raster, uint32 flags)
 //		raster->width, raster->height);
 
 #ifdef LIBRW_SDL2
+#ifndef __EMSCRIPTEN__
 	if(flags & Raster::FLIPWAITVSYNCH)
 		SDL_GL_SetSwapInterval(1);
 	else
 		SDL_GL_SetSwapInterval(0);
+#endif
+	// (the browser: the page shows a frame when the game gives it its turn, at its refresh rate — orthros_web.h)
 	SDL_GL_SwapWindow(glGlobals.window);
+#ifdef __EMSCRIPTEN__
+	EM_ASM({ if (Module.orthrosFrame) Module.orthrosFrame(); });
+#endif
 #else
 	if(flags & Raster::FLIPWAITVSYNCH)
 		glfwSwapInterval(1);
@@ -1532,6 +1551,9 @@ static struct {
 	int gl;
 	int major, minor;
 } profiles[] = {
+#ifdef __EMSCRIPTEN__
+	{ SDL_GL_CONTEXT_PROFILE_ES, 3, 0 }, // (WebGL 2)
+#endif
 	{ SDL_GL_CONTEXT_PROFILE_CORE, 3, 3 },
 	{ SDL_GL_CONTEXT_PROFILE_CORE, 2, 1 },
 	{ SDL_GL_CONTEXT_PROFILE_ES, 3, 1 },
@@ -1556,6 +1578,14 @@ startSDL2(void)
 		SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, profiles[i].major);
 		SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, profiles[i].minor);
 
+#ifdef __EMSCRIPTEN__
+		// (the browser: a window the size of the canvas on the page, which SDL follows; the page does full screen)
+		if(1) {
+			int w, h;
+			OrthrosCanvasSize(&w, &h);
+			win = SDL_CreateWindow(glGlobals.winTitle, SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, w, h, SDL_WINDOW_RESIZABLE | SDL_WINDOW_OPENGL);
+		} else
+#endif
 		if(mode->flags & VIDEOMODEEXCLUSIVE) {
 			win = SDL_CreateWindow(glGlobals.winTitle, SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, mode->mode.w, mode->mode.h, SDL_WINDOW_RESIZABLE | SDL_WINDOW_OPENGL | SDL_WINDOW_FULLSCREEN);
 			if (win)
@@ -1789,12 +1819,18 @@ initOpenGL(void)
 	}
 */
 	gl3Caps.dxtSupported = !!GLAD_GL_EXT_texture_compression_s3tc;
+#ifdef __EMSCRIPTEN__
+	gl3Caps.dxtSupported = emscripten_webgl_enable_extension(emscripten_webgl_get_current_context(), "WEBGL_compressed_texture_s3tc");
+	emscripten_webgl_enable_extension(emscripten_webgl_get_current_context(), "EXT_texture_filter_anisotropic");
+#endif
 	gl3Caps.astcSupported = !!GLAD_GL_KHR_texture_compression_astc_ldr;
 
 	glGetFloatv(GL_MAX_TEXTURE_MAX_ANISOTROPY_EXT, &gl3Caps.maxAnisotropy);
 
 	if(gl3Caps.gles){
-		if(gl3Caps.glversion >= 30)
+		if(gl3Caps.glversion == 30)
+			shaderDecl = shaderDecl300es;
+		else if(gl3Caps.glversion >= 30)
 			shaderDecl = shaderDecl310es;
 		else
 			shaderDecl = shaderDecl100es;
