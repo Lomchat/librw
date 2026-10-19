@@ -607,7 +607,7 @@ struct World;
 struct Atomic
 {
 	PLUGINBASE
-	typedef void (*RenderCB)(Atomic *atomic);
+	typedef Atomic *(*RenderCB)(Atomic *atomic); // (returns the atomic, as RenderWare's: the game's callbacks are called through it)
 	enum { ID = 1 };
 	enum {
 	// flags
@@ -661,7 +661,7 @@ struct Atomic
 	bool streamWriteClump(Stream *stream, FrameList_ *frmlst);
 	uint32 streamGetSize(void);
 
-	static void defaultRenderCB(Atomic *atomic);
+	static Atomic *defaultRenderCB(Atomic *atomic);
 };
 
 void registerAtomicRightsPlugin(void);
