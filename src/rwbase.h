@@ -13,6 +13,11 @@
 #define RWDEVICE gl3
 // doesn't help
 //#define RW_GL_USE_VAOS
+#ifdef __EMSCRIPTEN__
+// (WebGL 2: a vertex array object per instanced mesh — a draw binds it instead of setting each attribute, every call a
+// round trip through the browser's WebGL bindings)
+#define RW_GL_USE_VAOS
+#endif
 #endif
 
 #ifdef RW_GLES2

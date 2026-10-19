@@ -30,6 +30,20 @@ static int32 u_xform;
 #define STARTINDICES 10000
 #define STARTVERTICES 10000
 
+// An immediate draw's vertices or indices into its stream buffer (bound to `target`, `capacity` bytes).
+static void
+uploadStream(GLenum target, GLsizeiptr capacity, GLsizeiptr size, const void *data)
+{
+#ifdef __EMSCRIPTEN__
+	// (WebGL clears a buffer allocated without data: the whole capacity zeroed for each draw — the exact bytes given
+	// instead, in one call)
+	glBufferData(target, size, data, GL_STREAM_DRAW);
+#else
+	glBufferData(target, capacity, nil, GL_STREAM_DRAW);
+	glBufferSubData(target, 0, size, data);
+#endif
+}
+
 static Shader *im2dShader;
 static AttribDesc im2dattribDesc[3] = {
 	{ ATTRIB_POS,        GL_FLOAT,         GL_FALSE, 4,
@@ -133,8 +147,7 @@ im2DRenderPrimitive(PrimitiveType primType, void *vertices, int32 numVertices)
 #endif
 
 	glBindBuffer(GL_ARRAY_BUFFER, im2DVbo);
-	glBufferData(GL_ARRAY_BUFFER, STARTVERTICES*sizeof(Im2DVertex), nil, GL_STREAM_DRAW);
-	glBufferSubData(GL_ARRAY_BUFFER, 0, numVertices*sizeof(Im2DVertex), vertices);
+	uploadStream(GL_ARRAY_BUFFER, STARTVERTICES*sizeof(Im2DVertex), numVertices*sizeof(Im2DVertex), vertices);
 
 	if(im2dOverrideShader)
 		im2dOverrideShader->use();
@@ -163,12 +176,10 @@ im2DRenderIndexedPrimitive(PrimitiveType primType,
 #endif
 
 	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, im2DIbo);
-	glBufferData(GL_ELEMENT_ARRAY_BUFFER, STARTINDICES*2, nil, GL_STREAM_DRAW);
-	glBufferSubData(GL_ELEMENT_ARRAY_BUFFER, 0, numIndices*2, indices);
+	uploadStream(GL_ELEMENT_ARRAY_BUFFER, STARTINDICES*2, numIndices*2, indices);
 
 	glBindBuffer(GL_ARRAY_BUFFER, im2DVbo);
-	glBufferData(GL_ARRAY_BUFFER, STARTVERTICES*sizeof(Im2DVertex), nil, GL_STREAM_DRAW);
-	glBufferSubData(GL_ARRAY_BUFFER, 0, numVertices*sizeof(Im2DVertex), vertices);
+	uploadStream(GL_ARRAY_BUFFER, STARTVERTICES*sizeof(Im2DVertex), numVertices*sizeof(Im2DVertex), vertices);
 
 	if(im2dOverrideShader)
 		im2dOverrideShader->use();
@@ -274,8 +285,7 @@ im3DTransform(void *vertices, int32 numVertices, Matrix *world, uint32 flags)
 #endif
 
 	glBindBuffer(GL_ARRAY_BUFFER, im3DVbo);
-	glBufferData(GL_ARRAY_BUFFER, STARTVERTICES*sizeof(Im3DVertex), nil, GL_STREAM_DRAW);
-	glBufferSubData(GL_ARRAY_BUFFER, 0, numVertices*sizeof(Im3DVertex), vertices);
+	uploadStream(GL_ARRAY_BUFFER, STARTVERTICES*sizeof(Im3DVertex), numVertices*sizeof(Im3DVertex), vertices);
 #ifndef RW_GL_USE_VAOS
 	setAttribPointers(im3dattribDesc, 4);
 #endif
@@ -295,8 +305,7 @@ void
 im3DRenderIndexedPrimitive(PrimitiveType primType, void *indices, int32 numIndices)
 {
 	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, im3DIbo);
-	glBufferData(GL_ELEMENT_ARRAY_BUFFER, STARTINDICES*2, nil, GL_STREAM_DRAW);
-	glBufferSubData(GL_ELEMENT_ARRAY_BUFFER, 0, numIndices*2, indices);
+	uploadStream(GL_ELEMENT_ARRAY_BUFFER, STARTINDICES*2, numIndices*2, indices);
 
 	flushCache();
 	glDrawElements(primTypeMap[primType], numIndices,
